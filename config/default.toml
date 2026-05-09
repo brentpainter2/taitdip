@@ -1,3 +1,5 @@
+#config/default.toml
+
 [node_settings]
 node_ip = "127.0.0.1" # replace with actual IP address
 port = 9005
