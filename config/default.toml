@@ -1,0 +1,14 @@
+[node_settings]
+node_ip = "127.0.0.1" # replace with actual IP address
+port = 9005
+unit_address = "10020010"
+priority = 1
+codec = 1
+keep_alive_interval = 10
+
+[logging]
+directory = "logs"
+file_name = "tait_events.log"
+rotation = "hourly"            # "hourly" or "daily"
+retention_hours = 72
+level = "info"
