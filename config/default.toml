@@ -1,16 +1,17 @@
 #config/default.toml
 
 [node_settings]
-node_ip = "127.0.0.1" # replace with actual IP address
+version = 2
+node_ip = "127.0.0.1"
 port = 9005
-unit_address = "10020010"
+unit_address = "1234"
 priority = 1
 codec = 1
 keep_alive_interval = 10
 
 [logging]
 directory = "logs"
-file_name = "tait_events.log"
-rotation = "hourly"            # "hourly" or "daily"
-retention_hours = 72
-level = "info"
+file_name = "dip_client.log"
+rotation = "daily"
+retention_hours = 24
+level = "debug"
