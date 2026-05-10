@@ -1,186 +1,473 @@
 # Tait DIP Client
 
-A robust Rust implementation of a **Digital Interface Protocol (DIP)** client designed to interface with **Tait Node Controllers**. This application handles the initial handshake, registration, and persistent link maintenance required for digital radio system integration.
+## Introduction
 
-## 🚀 Features
+The **Tait DIP Client** is a Rust-based TCP application designed to connect to a Tait Digital Interface Protocol (DIP) node, authenticate using a login command, maintain a persistent session using keep-alive heartbeats, and continuously receive and log DIP events.
 
-- **DIP Login Handshake**: Implements the `li` command for unit registration (Protocol Version 3).
-- **Heartbeat Maintenance**: Automatic background thread for sending Keep Alive (`ka`) messages every 10 seconds.
-- **Structured Logging**: Utilizes the `tracing` ecosystem for high-performance diagnostics.
-- **Log Rotation**: Integrated file rotation (hourly/daily) via `tracing-appender` to prevent disk overflow.
-- **Configurable**: Fully managed via an external `config/default.toml` file.
+The application is designed with a strong focus on:
 
-## 🛠 Prerequisites
+- Reliability
+- Automatic reconnection
+- Structured logging
+- Session monitoring
+- Configuration-driven deployment
 
-- **Rust**: [Install Rust](https://rustup.rs/) (2021 edition or newer).
-- **Tait Node Controller**: Accessible via TCP/IP on the configured port.
+It is intended for long-running operational environments where resilient communications with a Tait radio/network infrastructure are required.
 
-## 📁 Project Structure
+---
+
+# Features
+
+## Core Capabilities
+
+- TCP client connection to a Tait DIP node
+- DIP login/authentication support
+- Automatic heartbeat ("ka") keep-alive messages
+- Continuous event reception
+- Structured logging using `tracing`
+- Automatic reconnection and retry handling
+- Configurable logging rotation
+- Runtime configurable via `default.toml`
+- Hex dump debugging for TX/RX protocol inspection
+
+---
+
+# Architecture Overview
 
 ```text
-tait_dip/
-├── Cargo.toml          # Project dependencies
-├── config/
-│   └── default.toml    # Node & Logging settings
-├── logs/               # Auto-generated log directory
-└── src/
-    └── main.rs         # Logic for DIP client & heartbeating
-
++------------------------------------------------------+
+|                  Tait DIP Client                     |
++------------------------------------------------------+
+                |
+                v
++------------------------------------------------------+
+|                Load Configuration                    |
+|                 config/default.toml                  |
++------------------------------------------------------+
+                |
+                v
++------------------------------------------------------+
+|                  Initialise Logging                  |
+|     Console + Rotating File Logging via tracing      |
++------------------------------------------------------+
+                |
+                v
++------------------------------------------------------+
+|                Main Resilience Loop                  |
+|          Connection + Retry Management               |
++------------------------------------------------------+
+                |
+                v
++------------------------------------------------------+
+|               Connect to DIP Node                    |
+|             TCP Socket Establishment                 |
++------------------------------------------------------+
+                |
+                v
++------------------------------------------------------+
+|                  Send Login Command                  |
+|       li:<version>:<address>:<priority>:<codec>     |
++------------------------------------------------------+
+                |
+                v
++------------------------------------------------------+
+|               Parse Login Response                   |
++------------------------------------------------------+
+        | Success                    | Failure
+        v                            v
++-------------------+      +--------------------------+
+| Start Session     |      | Retry / Backoff Logic    |
+| Keep Alive Thread |      | Reconnect Attempts       |
++-------------------+      +--------------------------+
+        |
+        v
++------------------------------------------------------+
+|              Receive Incoming Messages               |
+|          Log Events + Heartbeat Responses            |
++------------------------------------------------------+
 ```
 
-⚙️ Configuration
-The application is controlled via config/default.toml. Edit this file to match your environment:
-toml[node_settings]
-node_ip = "127.0.0.1"      # IP of the Tait Node Controller
-port = 9005                # Default DIP port
-unit_address = "10020010"  # Your Dispatcher/Client MPT1327 address
-priority = 1               # 0, 1, or 2 (Conflict resolution)
-codec = 1                  # 1 for G.711 µ-law, 0 for Analog
-keep_alive_interval = 10   # Seconds between heartbeats
+---
 
-[logging]
-directory = "logs"         # Path to store log files
-file_name = "tait_events.log"
-rotation = "hourly"        # Options: "hourly", "daily"
-retention_hours = 72       # History length (hours before deleting old files)
-level = "info"             # Options: "trace", "debug", "info", "warn", "error"
-📋 Monitoring Logs
-Logs are output to both the terminal and saved to the logs/ directory with a timestamp suffix (e.g., tait_events.log.2026-05-09-15).
-🧩 Architecture Details
-Login Flow
-Upon execution, the client establishes a TCP connection to the Node Controller and immediately sends the li command in the format:
-textli:3:<address>:<priority>:<codec>
-It waits up to 5 seconds for a response. If the Result Code is 0 (Success), the main operational loop begins.
-Thread Management
+# Configuration
 
-Main Thread: Blocks on the TCP stream, listening for incoming DIP events (call setups, status messages, etc.) from the Node Controller.
-Keep Alive Thread: A background thread that sends a ka message every keep_alive_interval seconds to prevent the Node Controller from dropping the connection due to inactivity.
+The application reads configuration from:
 
-Non-blocking Logging
-The application uses tracing-appender's non-blocking writer, ensuring that high-traffic radio events do not slow down core application logic due to filesystem I/O.
-📄 License
-This project is licensed under the MIT License. See the LICENSE file for details.
-text**Improvements made:**
-- Cleaner, more consistent Markdown formatting
-- Improved list styling (`-` instead of `*`)
-- Better code block for TOML config
-- Fixed awkward indentation and spacing
-- More professional wording and flow
-- Fixed the `$X$` LaTeX artifact
-- Better section titles and structure
-- Consistent bold/italic usagewhy does after configuration above escape markdownAnswer:
-In your original text, the configuration example was wrapped in ```text
-text```text
+```text
+config/default.toml
+```
+
+---
+
+## Example Configuration
+
+```toml
 [node_settings]
-...
-```
-This treats the content as plain text, so no syntax highlighting is applied, and it can sometimes cause minor rendering quirks.
-Why I changed it:
-I changed it to:
-Markdown```toml
-[node_settings]
-...
-```
-Reasons:
-
-Better syntax highlighting — Most Markdown viewers (GitHub, GitLab, VS Code, etc.) will properly highlight TOML syntax (keys, values, comments, sections) when you use toml` instead of text`.
-No escaping needed — Nothing is being "escaped" in a bad way. The square brackets [node_settings] are perfectly safe inside a code block. Code blocks prevent Markdown from interpreting the content as formatting.
-It's more professional — Since it's a real TOML config file, using the correct language identifier is the standard practice.
-
-If you're seeing escaped Markdown:
-If you're seeing literal backslashes \ or strange formatting when you copy the text, it's likely because:
-
-You copied from a chat interface that auto-escapes Markdown.
-You're pasting into a place that interprets Markdown twice.
-
-
-Recommended final version for the config section:
-toml[node_settings]
-node_ip = "127.0.0.1"      # IP of the Tait Node Controller
-port = 9005                # Default DIP port
-unit_address = "10020010"  # Your Dispatcher/Client MPT1327 address
-priority = 1               # 0, 1, or 2 (Conflict resolution)
-codec = 1                  # 1 for G.711 µ-law, 0 for Analog
-keep_alive_interval = 10   # Seconds between heartbeats
+version = 1
+node_ip = "192.168.1.100"
+port = 5000
+unit_address = "1234"
+priority = 1
+codec = 0
+keep_alive_interval = 30
 
 [logging]
-directory = "logs"         # Path to store log files
-file_name = "tait_events.log"
-rotation = "hourly"        # Options: "hourly", "daily"
-retention_hours = 72       # Hours before deleting old files
-level = "info"             # trace, debug, info, warn, error
-Would you like me to give you the entire cleaned Markdown again with any adjustments?yesHere's the fully cleaned and polished Markdown:
-Markdown# Tait DIP Client
-
-A robust Rust implementation of a **Digital Interface Protocol (DIP)** client designed to interface with **Tait Node Controllers**. This application handles the initial handshake, registration, and persistent link maintenance required for digital radio system integration.
-
-## 🚀 Features
-
-- **DIP Login Handshake**: Implements the `li` command for unit registration (Protocol Version 3).
-- **Heartbeat Maintenance**: Automatic background thread for sending Keep Alive (`ka`) messages every 10 seconds.
-- **Structured Logging**: Utilizes the `tracing` ecosystem for high-performance diagnostics.
-- **Log Rotation**: Integrated file rotation (hourly/daily) via `tracing-appender` to prevent disk overflow.
-- **Configurable**: Fully managed via an external `config/default.toml` file.
-
-## 🛠 Prerequisites
-
-- **Rust**: [Install Rust](https://rustup.rs/) (2021 edition or newer).
-- **Tait Node Controller**: Accessible via TCP/IP on the configured port.
-
-## 📁 Project Structure
-
-```text
-tait_dip/
-├── Cargo.toml          # Project dependencies
-├── config/
-│   └── default.toml    # Node & Logging settings
-├── logs/               # Auto-generated log directory
-└── src/
-    └── main.rs         # Logic for DIP client & heartbeating
+directory = "logs"
+file_name = "tait_dip.log"
+rotation = "daily"
+retention_hours = 168
+level = "info"
 ```
 
-## ⚙️ Configuration
+---
 
-The application is controlled via config/default.toml. Edit this file to match your environment:
+# Configuration Parameters
+
+## Node Settings
+
+| Parameter | Description |
+|---|---|
+| `version` | DIP protocol version |
+| `node_ip` | IP address of DIP node |
+| `port` | TCP port number |
+| `unit_address` | Unit/login identifier |
+| `priority` | Connection priority |
+| `codec` | Audio/data codec setting |
+| `keep_alive_interval` | Heartbeat interval in seconds |
+
+---
+
+## Logging Settings
+
+| Parameter | Description |
+|---|---|
+| `directory` | Log file directory |
+| `file_name` | Base log file name |
+| `rotation` | Log rotation mode (`hourly`, `daily`, `never`) |
+| `retention_hours` | Reserved for future retention management |
+| `level` | Logging level (`error`, `warn`, `info`, `debug`, `trace`) |
+
+---
+
+# Connection Workflow
+
+## 1. TCP Connection
+
+The client connects to the configured DIP node using a standard TCP socket.
 
 ```text
-toml[node_settings]
-node_ip = "127.0.0.1"      # IP of the Tait Node Controller
-port = 9005                # Default DIP port
-unit_address = "10020010"  # Your Dispatcher/Client MPT1327 address
-priority = 1               # 0, 1, or 2 (Conflict resolution)
-codec = 1                  # 1 for G.711 µ-law, 0 for Analog
-keep_alive_interval = 10   # Seconds between heartbeats
-
-[logging]
-directory = "logs"         # Path to store log files
-file_name = "tait_events.log"
-rotation = "hourly"        # Options: "hourly", "daily"
-retention_hours = 72       # Hours before deleting old files
-level = "info"             # Options: trace, debug, info, warn, error
+<node_ip>:<port>
 ```
 
-## 📋 Monitoring Logs
+Example:
 
-Logs are output to both the terminal and saved to the logs/ directory with a timestamp suffix (e.g. tait_events.log.2026-05-09-15).
+```text
+192.168.1.100:5000
+```
 
-## 🧩 Architecture Details
+---
 
-### Login Flow
-Upon execution, the client establishes a TCP connection to the Node Controller and immediately sends the li command in the following format:
-textli:3:<address>:<priority>:<codec>
-It waits up to 5 seconds for a response. If the Result Code is 0 (Success), the main operational loop begins.
+## 2. Login Procedure
 
-### Thread Management
+After connecting, the application transmits a DIP login command:
 
-Main Thread: Blocks on the TCP stream, listening for incoming DIP events (call setups, status messages, etc.) from the Node Controller.
-Keep Alive Thread: A background thread that sends a ka message every keep_alive_interval seconds to prevent the Node Controller from dropping the connection due to inactivity.
+```text
+li:<version>:<unit_address>:<priority>:<codec>
+```
 
-### Non-blocking Logging
+Example:
 
-The application uses tracing-appender's non-blocking writer, ensuring that high-traffic radio events do not slow down core application logic due to filesystem I/O.
+```text
+li:1:1234:1:0
+```
 
-## 📄 License
+---
 
-This project is licensed under the MIT License. See the LICENSE file for details.
-textThis version is clean, professional, and uses the best practices for Markdown rendering. Let me know if you want any further tweaks!
+## 3. Login Response Handling
+
+The application validates the response from the DIP node.
+
+### Success Response
+
+```text
+li:<version>:0
+```
+
+Where:
+
+```text
+0 = Login successful
+```
+
+### Failure Response
+
+```text
+li:<version>:3
+```
+
+Where:
+
+```text
+3 = Already connected / ghosted session
+```
+
+Other error codes are logged as connection failures.
+
+---
+
+# Keep Alive Mechanism
+
+Once authenticated, a dedicated background thread periodically sends heartbeat messages:
+
+```text
+ka
+```
+
+The node is expected to acknowledge with:
+
+```text
+ka
+```
+
+This mechanism ensures:
+
+- Session persistence
+- Connection monitoring
+- Detection of broken TCP sessions
+
+---
+
+# Session Handling
+
+The main session loop continuously reads incoming lines from the DIP node.
+
+## Message Types
+
+### Heartbeat Acknowledgements
+
+```text
+ka
+```
+
+Logged as:
+
+```text
+Node acknowledged heartbeat
+```
+
+---
+
+### DIP Events
+
+Any non-empty message is treated as a DIP event and logged.
+
+Example:
+
+```text
+Received DIP event
+```
+
+---
+
+# Reliability & Reconnection Logic
+
+The application includes a resilience loop designed for unattended operation.
+
+---
+
+## Retry Behaviour
+
+### Standard Retry
+
+- Retry delay: 5 seconds
+- Maximum retries before cooldown: 3
+
+### Cooldown Mode
+
+After repeated failures:
+
+```text
+Cooldown duration: 60 seconds
+```
+
+This prevents aggressive reconnect storms.
+
+---
+
+# Logging System
+
+The application uses:
+
+- `tracing`
+- `tracing_subscriber`
+- `tracing_appender`
+
+for structured, high-performance logging.
+
+---
+
+## Logging Outputs
+
+### Console Logging
+
+Real-time logs written to stdout.
+
+### File Logging
+
+Rotating log files stored in the configured log directory.
+
+---
+
+## Supported Log Levels
+
+| Level | Description |
+|---|---|
+| `ERROR` | Critical failures |
+| `WARN` | Warning conditions |
+| `INFO` | General operational events |
+| `DEBUG` | Detailed diagnostics |
+| `TRACE` | Very verbose protocol-level detail |
+
+---
+
+# Hex Debugging
+
+For troubleshooting and protocol analysis, the application logs both:
+
+- Human-readable strings
+- Raw hexadecimal byte streams
+
+Example:
+
+```text
+TX String: "li:1:1234:1:0"
+TX Hex:    [6C 69 3A 31 3A 31 32 33 34]
+```
+
+This is useful for:
+
+- DIP protocol debugging
+- Wire-level troubleshooting
+- Character encoding validation
+
+---
+
+# Threading Model
+
+The application uses a lightweight multi-threaded design.
+
+## Main Thread
+
+Responsible for:
+
+- Connection management
+- Session handling
+- Message reception
+
+## Heartbeat Thread
+
+Responsible for:
+
+- Periodic keep-alive transmission
+
+---
+
+# Application Startup
+
+On startup, the application logs:
+
+- Application version
+- Build profile (`debug` or `release`)
+
+Example:
+
+```text
+=== Starting Tait DIP client (Reliability Mode) ===
+```
+
+---
+
+# Error Handling
+
+The application handles:
+
+- TCP connection failures
+- Login failures
+- Session disconnects
+- Broken keep-alive streams
+- Malformed DIP responses
+
+Errors are logged with structured metadata.
+
+---
+
+# Dependencies
+
+## Core Crates
+
+| Crate | Purpose |
+|---|---|
+| `serde` | TOML deserialization |
+| `toml` | Configuration parsing |
+| `tracing` | Structured logging |
+| `tracing_subscriber` | Logging subscribers |
+| `tracing_appender` | Rolling log files |
+
+---
+
+# Intended Use Cases
+
+This application is suitable for:
+
+- Radio network event monitoring
+- Tait DIP integrations
+- Infrastructure telemetry
+- Alarm/event collection
+- Long-running operational services
+- Headless Linux deployments
+
+---
+
+# Build & Run
+
+## Debug Build
+
+```bash
+cargo run
+```
+
+---
+
+## Release Build
+
+```bash
+cargo build --release
+```
+
+Run:
+
+```bash
+./target/release/tait-dip-client
+```
+
+---
+
+# Future Enhancement Ideas
+
+Potential improvements include:
+
+- Async Tokio-based networking
+- Configurable exponential backoff
+- Metrics/health endpoints
+- Persistent event storage
+- TLS support
+- Systemd watchdog integration
+- Graceful shutdown handling
+- Heartbeat timeout detection
+- Connection state dashboard
+
+---
+
+# Summary
+
+The Tait DIP Client is a resilient Rust TCP application designed for reliable communication with Tait DIP nodes. It provides automatic recovery, structured logging, heartbeat monitoring, and continuous event processing suitable for production operational environments.
